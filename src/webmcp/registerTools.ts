@@ -56,7 +56,7 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
   await document.modelContext.registerTool({
     name: 'search_properties',
     title: 'Search properties',
-    description: 'Use this first for property-discovery requests. Search available real-estate listings using structured criteria such as location, price, bedrooms, property type, renovation status, and features. Returns stable property IDs for follow-up inspection or comparison.',
+    description: 'Use this first for property-discovery requests. Search available real-estate listings using structured criteria such as location, price, bedrooms, property type, renovation status, and features. Returned summaries already include enough facts for normal comparison: stable property ID, title, neighborhood, price, size, bedrooms, renovation status, features, and listing URL. If the user asks to compare the best options, pass the returned IDs directly to compare_properties; do not call get_property_details merely to compare them.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -94,7 +94,7 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
   await document.modelContext.registerTool({
     name: 'get_property_details',
     title: 'Get property details',
-    description: 'Read normalized public details for one property using a stable property ID returned by search_properties. Use when more facts are needed before comparison or enquiry preparation.',
+    description: 'Optional deep-inspection tool for one property. Use only when the user explicitly asks for additional facts that are not already present in search_properties or compare_properties. Do NOT call this tool merely to choose the top-ranked property, save a favorite, or prepare an enquiry after a comparison; those steps can proceed directly from the comparison result.',
     inputSchema: {
       type: 'object',
       properties: { propertyId: { type: 'string', description: 'Stable property ID returned by search_properties.' } },
@@ -117,7 +117,7 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
   await document.modelContext.registerTool({
     name: 'compare_properties',
     title: 'Compare properties',
-    description: 'Use after search_properties when the user asks for the best options or a comparison. Compare 2–5 property IDs with a transparent deterministic score against priorities such as price, space, renovation, metro access, university access, or outdoor space. Returns ranked candidates and tradeoffs.',
+    description: 'Use after search_properties when the user asks for the best options or a comparison. Compare 2–5 property IDs with a transparent deterministic score against priorities such as price, space, renovation, metro access, university access, or outdoor space. The result is sufficient to make the next decision: it returns ranked candidates with propertyId, title, score, strengths, tradeoffs, and score breakdown. If the user says save my favorite without naming one, treat rank #1 as the favorite and call save_favorite directly. If the user also asks for an enquiry, call prepare_enquiry on that same property next. Do not call get_property_details between these steps unless the user explicitly requests additional facts.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -153,7 +153,7 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
   await document.modelContext.registerTool({
     name: 'save_favorite',
     title: 'Save favorite',
-    description: 'Save a specific property to the user\'s challenge-session favorites. Use only when the user asks to save or favorite a property, normally after a preferred candidate has been identified. This changes session state but does not access private production account data.',
+    description: 'Save a specific property to the user\'s challenge-session favorites. Use only when the user asks to save or favorite a property. After compare_properties, if the user did not name a different preference, save rank #1 directly; no get_property_details call is needed. This changes session state but does not access private production account data. If the same user request also asks to prepare an enquiry, immediately call prepare_enquiry next with the same propertyId.',
     inputSchema: {
       type: 'object',
       properties: { propertyId: { type: 'string', description: 'Stable property ID to save.' } },
@@ -178,7 +178,7 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
   await document.modelContext.registerTool({
     name: 'prepare_enquiry',
     title: 'Prepare property enquiry',
-    description: 'Final preparation step for a selected property. Create an enquiry draft for human review only. Never send, submit, or contact the advertiser. The returned draft always requires explicit human confirmation before any real-world contact can occur.',
+    description: 'Final preparation step for a selected property. Create an enquiry draft for human review only. This tool can work from propertyId alone; do not call get_property_details first just to prepare the draft. If name, email, phone, or message intent were not supplied by the user, leave them absent and still create the reviewable draft. Never send, submit, or contact the advertiser. The returned draft always requires explicit human confirmation before any real-world contact can occur.',
     inputSchema: {
       type: 'object',
       properties: {
