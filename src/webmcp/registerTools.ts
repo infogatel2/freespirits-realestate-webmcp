@@ -1,0 +1,113 @@
+import type { PropertySearchCriteria, PropertySummary } from '../domain/property';
+import { demoPropertyProvider } from '../services/demoPropertyProvider';
+
+export interface WebMCPCallbacks {
+  onActivity: (message: string) => void;
+  onSearchResults: (results: PropertySummary[]) => void;
+}
+
+const textResult = (payload: unknown) => ({
+  content: [{ type: 'text', text: JSON.stringify(payload) }],
+});
+
+const asOptionalString = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : undefined);
+const asOptionalNumber = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
+const asOptionalBoolean = (value: unknown) => (typeof value === 'boolean' ? value : undefined);
+const asOptionalStringArray = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : undefined;
+
+const parseSearchCriteria = (input: Record<string, unknown>): PropertySearchCriteria => {
+  const minPrice = asOptionalNumber(input.minPrice);
+  const maxPrice = asOptionalNumber(input.maxPrice);
+  const minBedrooms = asOptionalNumber(input.minBedrooms);
+  const maxBedrooms = asOptionalNumber(input.maxBedrooms);
+  const requestedLimit = asOptionalNumber(input.limit);
+
+  if (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice) {
+    throw new Error('minPrice cannot be greater than maxPrice.');
+  }
+  if (minBedrooms !== undefined && maxBedrooms !== undefined && minBedrooms > maxBedrooms) {
+    throw new Error('minBedrooms cannot be greater than maxBedrooms.');
+  }
+
+  return {
+    transactionType: input.transactionType === 'rent' || input.transactionType === 'sale' ? input.transactionType : undefined,
+    location: asOptionalString(input.location),
+    minPrice,
+    maxPrice,
+    minBedrooms,
+    maxBedrooms,
+    propertyTypes: asOptionalStringArray(input.propertyTypes),
+    renovated: asOptionalBoolean(input.renovated),
+    features: asOptionalStringArray(input.features),
+    limit: requestedLimit === undefined ? 10 : Math.max(1, Math.min(Math.trunc(requestedLimit), 20)),
+  };
+};
+
+export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
+  if (!document.modelContext) {
+    callbacks.onActivity('WebMCP is not available in this browser context.');
+    return () => undefined;
+  }
+
+  const controller = new AbortController();
+
+  await document.modelContext.registerTool({
+    name: 'search_properties',
+    title: 'Search properties',
+    description: 'Search available real-estate listings using structured criteria such as location, price, bedrooms, property type, renovation status, and features.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        transactionType: { type: 'string', enum: ['rent', 'sale'], description: 'Whether the user wants to rent or buy.' },
+        location: { type: 'string', description: 'City or neighborhood, for example Thessaloniki or Toumba.' },
+        minPrice: { type: 'number', minimum: 0 },
+        maxPrice: { type: 'number', minimum: 0 },
+        minBedrooms: { type: 'integer', minimum: 0 },
+        maxBedrooms: { type: 'integer', minimum: 0 },
+        propertyTypes: { type: 'array', items: { type: 'string' } },
+        renovated: { type: 'boolean' },
+        features: { type: 'array', items: { type: 'string' } },
+        limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
+      },
+    },
+    async execute(input) {
+      try {
+        const criteria = parseSearchCriteria(input);
+        callbacks.onActivity(`Agent searched properties${criteria.location ? ` in ${criteria.location}` : ''}.`);
+        const results = await demoPropertyProvider.search(criteria);
+        callbacks.onSearchResults(results);
+        return textResult({ ok: true, criteria, count: results.length, results });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown search error.';
+        callbacks.onActivity(`Search rejected: ${message}`);
+        return textResult({ ok: false, error: message });
+      }
+    },
+  }, { signal: controller.signal });
+
+  await document.modelContext.registerTool({
+    name: 'get_property_details',
+    title: 'Get property details',
+    description: 'Retrieve normalized public details for a single property by its stable property ID.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        propertyId: { type: 'string', description: 'Stable property ID returned by search_properties.' },
+      },
+      required: ['propertyId'],
+    },
+    async execute(input) {
+      const propertyId = asOptionalString(input.propertyId);
+      if (!propertyId) return textResult({ ok: false, error: 'propertyId is required.' });
+
+      const property = await demoPropertyProvider.getById(propertyId);
+      if (!property) return textResult({ ok: false, error: `Property ${propertyId} was not found.` });
+
+      callbacks.onActivity(`Agent inspected ${property.title}.`);
+      return textResult({ ok: true, property });
+    },
+  }, { signal: controller.signal });
+
+  callbacks.onActivity('WebMCP ready: search_properties and get_property_details registered.');
+  return () => controller.abort();
+}
