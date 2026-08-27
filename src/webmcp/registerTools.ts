@@ -56,7 +56,7 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
   await document.modelContext.registerTool({
     name: 'search_properties',
     title: 'Search properties',
-    description: 'Search available real-estate listings using structured criteria such as location, price, bedrooms, property type, renovation status, and features.',
+    description: 'Use this first for property-discovery requests. Search available real-estate listings using structured criteria such as location, price, bedrooms, property type, renovation status, and features. Returns stable property IDs for follow-up inspection or comparison.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -71,6 +71,10 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
         features: { type: 'array', items: { type: 'string' } },
         limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
       },
+    },
+    annotations: {
+      readOnlyHint: true,
+      untrustedContentHint: true,
     },
     async execute(input) {
       try {
@@ -90,11 +94,15 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
   await document.modelContext.registerTool({
     name: 'get_property_details',
     title: 'Get property details',
-    description: 'Retrieve normalized public details for a single property by its stable property ID.',
+    description: 'Read normalized public details for one property using a stable property ID returned by search_properties. Use when more facts are needed before comparison or enquiry preparation.',
     inputSchema: {
       type: 'object',
       properties: { propertyId: { type: 'string', description: 'Stable property ID returned by search_properties.' } },
       required: ['propertyId'],
+    },
+    annotations: {
+      readOnlyHint: true,
+      untrustedContentHint: true,
     },
     async execute(input) {
       const propertyId = asOptionalString(input.propertyId);
@@ -109,7 +117,7 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
   await document.modelContext.registerTool({
     name: 'compare_properties',
     title: 'Compare properties',
-    description: 'Compare 2–5 properties with a transparent deterministic score against priorities such as price, space, renovation, metro access, university access, or outdoor space.',
+    description: 'Use after search_properties when the user asks for the best options or a comparison. Compare 2–5 property IDs with a transparent deterministic score against priorities such as price, space, renovation, metro access, university access, or outdoor space. Returns ranked candidates and tradeoffs.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -117,6 +125,10 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
         priorities: { type: 'array', items: { type: 'string', enum: allowedPriorities } },
       },
       required: ['propertyIds'],
+    },
+    annotations: {
+      readOnlyHint: true,
+      untrustedContentHint: true,
     },
     async execute(input) {
       try {
@@ -141,11 +153,15 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
   await document.modelContext.registerTool({
     name: 'save_favorite',
     title: 'Save favorite',
-    description: 'Save a property to the user\'s challenge-session favorites. This operation is idempotent and does not expose private production account data.',
+    description: 'Save a specific property to the user\'s challenge-session favorites. Use only when the user asks to save or favorite a property, normally after a preferred candidate has been identified. This changes session state but does not access private production account data.',
     inputSchema: {
       type: 'object',
       properties: { propertyId: { type: 'string', description: 'Stable property ID to save.' } },
       required: ['propertyId'],
+    },
+    annotations: {
+      readOnlyHint: false,
+      untrustedContentHint: false,
     },
     async execute(input) {
       const propertyId = asOptionalString(input.propertyId);
@@ -162,7 +178,7 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
   await document.modelContext.registerTool({
     name: 'prepare_enquiry',
     title: 'Prepare property enquiry',
-    description: 'Prepare a property enquiry draft for human review. This tool never sends the enquiry and always requires explicit human confirmation.',
+    description: 'Final preparation step for a selected property. Create an enquiry draft for human review only. Never send, submit, or contact the advertiser. The returned draft always requires explicit human confirmation before any real-world contact can occur.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -173,6 +189,10 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
         messageIntent: { type: 'string', description: 'Optional user-provided request or question to include in the draft.' },
       },
       required: ['propertyId'],
+    },
+    annotations: {
+      readOnlyHint: false,
+      untrustedContentHint: true,
     },
     async execute(input) {
       const propertyId = asOptionalString(input.propertyId);
