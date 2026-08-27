@@ -1,11 +1,15 @@
 import { compareProperties, type ComparisonPriority, type PropertyComparison } from '../domain/comparison';
+import { prepareEnquiryDraft, type EnquiryDraft } from '../domain/enquiry';
 import type { PropertySearchCriteria, PropertySummary } from '../domain/property';
 import { demoPropertyProvider } from '../services/demoPropertyProvider';
+import { favoriteStore, type FavoriteResult } from '../state/favorites';
 
 export interface WebMCPCallbacks {
   onActivity: (message: string) => void;
   onSearchResults: (results: PropertySummary[]) => void;
   onComparison: (comparison: PropertyComparison) => void;
+  onFavorite: (result: FavoriteResult) => void;
+  onEnquiry: (draft: EnquiryDraft) => void;
 }
 
 const textResult = (payload: unknown) => ({
@@ -16,7 +20,6 @@ const asOptionalString = (value: unknown) => (typeof value === 'string' && value
 const asOptionalNumber = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
 const asOptionalBoolean = (value: unknown) => (typeof value === 'boolean' ? value : undefined);
 const asOptionalStringArray = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : undefined;
-
 const allowedPriorities: ComparisonPriority[] = ['price', 'space', 'renovated', 'metro_access', 'university_access', 'outdoor_space'];
 
 const parseSearchCriteria = (input: Record<string, unknown>): PropertySearchCriteria => {
@@ -25,7 +28,6 @@ const parseSearchCriteria = (input: Record<string, unknown>): PropertySearchCrit
   const minBedrooms = asOptionalNumber(input.minBedrooms);
   const maxBedrooms = asOptionalNumber(input.maxBedrooms);
   const requestedLimit = asOptionalNumber(input.limit);
-
   if (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice) throw new Error('minPrice cannot be greater than maxPrice.');
   if (minBedrooms !== undefined && maxBedrooms !== undefined && minBedrooms > maxBedrooms) throw new Error('minBedrooms cannot be greater than maxBedrooms.');
 
@@ -107,7 +109,7 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
   await document.modelContext.registerTool({
     name: 'compare_properties',
     title: 'Compare properties',
-    description: 'Compare 2–5 properties with a transparent deterministic score against user priorities such as price, space, renovation, metro access, university access, or outdoor space.',
+    description: 'Compare 2–5 properties with a transparent deterministic score against priorities such as price, space, renovation, metro access, university access, or outdoor space.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -136,6 +138,59 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
     },
   }, { signal: controller.signal });
 
-  callbacks.onActivity('WebMCP ready: search, details, and comparison tools registered.');
+  await document.modelContext.registerTool({
+    name: 'save_favorite',
+    title: 'Save favorite',
+    description: 'Save a property to the user\'s challenge-session favorites. This operation is idempotent and does not expose private production account data.',
+    inputSchema: {
+      type: 'object',
+      properties: { propertyId: { type: 'string', description: 'Stable property ID to save.' } },
+      required: ['propertyId'],
+    },
+    async execute(input) {
+      const propertyId = asOptionalString(input.propertyId);
+      if (!propertyId) return textResult({ ok: false, error: 'propertyId is required.' });
+      const property = await demoPropertyProvider.getById(propertyId);
+      if (!property) return textResult({ ok: false, error: `Property ${propertyId} was not found.` });
+      const result = favoriteStore.save(propertyId);
+      callbacks.onFavorite(result);
+      callbacks.onActivity(result.alreadySaved ? `Agent confirmed ${property.title} was already a favorite.` : `Agent saved ${property.title} as a favorite.`);
+      return textResult({ ok: true, result });
+    },
+  }, { signal: controller.signal });
+
+  await document.modelContext.registerTool({
+    name: 'prepare_enquiry',
+    title: 'Prepare property enquiry',
+    description: 'Prepare a property enquiry draft for human review. This tool never sends the enquiry and always requires explicit human confirmation.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        propertyId: { type: 'string', description: 'Stable property ID for the enquiry.' },
+        name: { type: 'string' },
+        email: { type: 'string' },
+        phone: { type: 'string' },
+        messageIntent: { type: 'string', description: 'Optional user-provided request or question to include in the draft.' },
+      },
+      required: ['propertyId'],
+    },
+    async execute(input) {
+      const propertyId = asOptionalString(input.propertyId);
+      if (!propertyId) return textResult({ ok: false, error: 'propertyId is required.' });
+      const property = await demoPropertyProvider.getById(propertyId);
+      if (!property) return textResult({ ok: false, error: `Property ${propertyId} was not found.` });
+      const draft = prepareEnquiryDraft(property, {
+        name: asOptionalString(input.name),
+        email: asOptionalString(input.email),
+        phone: asOptionalString(input.phone),
+        messageIntent: asOptionalString(input.messageIntent),
+      });
+      callbacks.onEnquiry(draft);
+      callbacks.onActivity(`Agent prepared an enquiry for ${property.title}; human confirmation is required.`);
+      return textResult({ ok: true, draft });
+    },
+  }, { signal: controller.signal });
+
+  callbacks.onActivity('WebMCP ready: five challenge tools registered.');
   return () => controller.abort();
 }

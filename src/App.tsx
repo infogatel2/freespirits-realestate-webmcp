@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { PropertyComparison } from './domain/comparison';
+import type { EnquiryDraft } from './domain/enquiry';
 import type { PropertySummary } from './domain/property';
 import { registerWebMCPTools } from './webmcp/registerTools';
 
@@ -8,6 +9,8 @@ const demoPrompt = 'Find renovated 2–3 bedroom apartments in Thessaloniki unde
 export default function App() {
   const [results, setResults] = useState<PropertySummary[]>([]);
   const [comparison, setComparison] = useState<PropertyComparison | null>(null);
+  const [favoriteCount, setFavoriteCount] = useState(0);
+  const [enquiry, setEnquiry] = useState<EnquiryDraft | null>(null);
   const [activity, setActivity] = useState<string[]>(['Challenge Edition loaded.']);
   const webMCPAvailable = useMemo(() => typeof document !== 'undefined' && Boolean(document.modelContext), []);
 
@@ -19,6 +22,8 @@ export default function App() {
       onActivity: (message) => active && setActivity((items) => [message, ...items].slice(0, 8)),
       onSearchResults: (items) => active && setResults(items),
       onComparison: (value) => active && setComparison(value),
+      onFavorite: (result) => active && setFavoriteCount(result.favoriteCount),
+      onEnquiry: (draft) => active && setEnquiry(draft),
     }).then((dispose) => {
       if (!active) dispose();
       else cleanup = dispose;
@@ -41,16 +46,19 @@ export default function App() {
           <h1>FreeSpirits Real Estate</h1>
           <p className="lead">Property discovery designed for humans and agents to work together.</p>
         </div>
-        <div className={`status ${webMCPAvailable ? 'ready' : 'waiting'}`}>
-          <span className="dot" />
-          {webMCPAvailable ? 'WebMCP detected' : 'WebMCP-capable browser required'}
+        <div className="header-badges">
+          <div className={`status ${webMCPAvailable ? 'ready' : 'waiting'}`}>
+            <span className="dot" />
+            {webMCPAvailable ? 'WebMCP detected' : 'WebMCP-capable browser required'}
+          </div>
+          <div className="status">★ {favoriteCount} favorites</div>
         </div>
       </header>
 
       <section className="prompt-card">
         <p className="label">Headline demo request</p>
         <blockquote>{demoPrompt}</blockquote>
-        <p className="hint">Open this page in a WebMCP-enabled browser/agent and use the request above. Tool calls update the page so the collaboration remains visible to the human.</p>
+        <p className="hint">Open this page in a WebMCP-enabled browser/agent and use the request above. Tool calls visibly update the product while consequential contact remains under human control.</p>
       </section>
 
       <section className="grid">
@@ -99,6 +107,26 @@ export default function App() {
               </div>
             )}
           </div>
+
+          <div className="panel enquiry-panel">
+            <p className="label">Human-controlled next step</p>
+            <h2>Enquiry review</h2>
+            {!enquiry ? (
+              <div className="empty">Invoke <code>prepare_enquiry</code> for a chosen property. The tool will prepare a draft, never send it.</div>
+            ) : (
+              <div className="enquiry-card">
+                <div className="confirmation-pill">Human confirmation required</div>
+                <h3>{enquiry.propertyTitle}</h3>
+                <p>{enquiry.message}</p>
+                <div className="enquiry-meta">
+                  {enquiry.name && <span>Name: {enquiry.name}</span>}
+                  {enquiry.email && <span>Email: {enquiry.email}</span>}
+                  {enquiry.phone && <span>Phone: {enquiry.phone}</span>}
+                </div>
+                <button type="button" disabled title="Challenge Edition intentionally does not auto-send enquiries">Review only — sending disabled in challenge demo</button>
+              </div>
+            )}
+          </div>
         </div>
 
         <aside className="panel activity-panel">
@@ -110,13 +138,15 @@ export default function App() {
             <code>search_properties</code>
             <code>get_property_details</code>
             <code>compare_properties</code>
+            <code>save_favorite</code>
+            <code>prepare_enquiry</code>
           </div>
         </aside>
       </section>
 
       <footer className="page-footer">
         <span>Challenge-safe demo data · no production secrets</span>
-        <span>Comparison scores are deterministic and inspectable</span>
+        <span>Five WebMCP tools · human confirmation for enquiry</span>
       </footer>
     </main>
   );
