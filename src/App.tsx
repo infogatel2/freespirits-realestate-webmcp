@@ -10,7 +10,7 @@ export default function App() {
   const webMCPAvailable = useMemo(() => typeof document !== 'undefined' && Boolean(document.modelContext), []);
 
   useEffect(() => {
-    let cleanup = () => undefined;
+    let cleanup: () => void = () => undefined;
     let active = true;
 
     registerWebMCPTools({
