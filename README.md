@@ -2,29 +2,104 @@
 
 FreeSpirits Real Estate — WebMCP Challenge Edition is a focused, open-source extension of the existing FreeSpirits Real Estate marketplace, created for **The WebMCP Challenge**.
 
-The goal is to explore a real agent-native property discovery workflow where people and AI agents can work together through structured WebMCP tools instead of forcing an agent to infer intent from page layouts, buttons, and forms.
+It demonstrates a real agent-native property discovery workflow where people and AI agents work together through structured WebMCP tools instead of forcing an agent to infer intent from page layouts, buttons, and forms.
 
-## Challenge vision
-
-A user should be able to ask an agent something like:
+## The demo in one sentence
 
 > Find renovated 2–3 bedroom apartments in Thessaloniki under €750/month, compare the best three, save my favorite, and prepare an enquiry for me to review.
 
-The website exposes structured WebMCP capabilities so the agent can perform those steps reliably while preserving human control for consequential actions.
+The agent can execute that multi-step journey using tools exposed directly by the web application while the human remains in control of consequential contact.
 
-## Planned WebMCP tools
+## Working WebMCP tools
 
-- `search_properties` — structured search over available properties
-- `get_property_details` — retrieve normalized details for one listing
-- `compare_properties` — compare selected properties against user priorities
-- `save_favorite` — save a selected property where the user context permits it
-- `prepare_enquiry` — prepare, but do not silently send, a property enquiry for human review
+The Challenge Edition currently registers five tools through `document.modelContext.registerTool(...)`:
 
-## Human + agent interaction
+- `search_properties` — structured property discovery using location, transaction type, price, bedroom count, property type, renovation status, features, and bounded result limits.
+- `get_property_details` — normalized public facts for a stable property ID.
+- `compare_properties` — deterministic, priority-aware comparison for 2–5 properties using price, space, renovation status, metro access, university access, and outdoor space.
+- `save_favorite` — idempotent challenge-session favorite saving without exposing production account internals.
+- `prepare_enquiry` — creates an enquiry draft for review and always returns `requiresHumanConfirmation: true`; it never silently sends the enquiry.
 
-The Challenge Edition is intentionally designed around collaboration rather than blind automation.
+Tool calls visibly update the application, so the human can see the search results, ranking, favorites, enquiry draft, and agent activity as the workflow progresses.
 
-The agent can search, inspect, filter, summarize, compare, and prepare actions. A human remains in control of sensitive or consequential steps such as sending an enquiry.
+## Why WebMCP fits this problem
+
+Traditional real-estate search makes users repeatedly operate filters, open listings, compare details, remember tradeoffs, save candidates, and fill contact forms. A generic browser agent has to guess how each interface works.
+
+With WebMCP, the website declares exactly what an agent may do and what the data means. The result is a more reliable collaboration model:
+
+```text
+Natural-language request
+        |
+        v
+search_properties
+        |
+        v
+get_property_details
+        |
+        v
+compare_properties
+        |
+        v
+save_favorite
+        |
+        v
+prepare_enquiry
+        |
+        v
+HUMAN REVIEW / CONFIRMATION
+```
+
+## Transparent decision support
+
+The comparison layer does not ask an LLM to invent a score. The scoring implementation is deterministic and lives in the public source code.
+
+A user can prioritize factors such as:
+
+- price
+- space
+- renovation status
+- metro access
+- university access
+- outdoor space
+
+The tool returns ranking scores, strengths, tradeoffs, and missing-data warnings grounded in the available property facts.
+
+## Human + agent safety boundary
+
+This project is intentionally designed around collaboration rather than blind automation.
+
+The agent can search, inspect, compare, shortlist, save a challenge-session favorite, and prepare an enquiry. The Challenge Edition does **not** autonomously send an enquiry.
+
+The final contact step explicitly hands control back to the human.
+
+## Reproducible challenge data
+
+The repository includes sanitized Thessaloniki demo listings so judges and developers can reproduce the complete workflow without production database access or private credentials.
+
+A challenge-safe remote data adapter can be added separately while retaining the bundled dataset as a fallback.
+
+## Quick start
+
+Requirements: Node.js 22+ and npm.
+
+```bash
+npm install
+npm test
+npm run build
+npm run dev
+```
+
+The public CI workflow also runs the tests and production build on pushes to `main`.
+
+See:
+
+- [`docs/TESTING.md`](docs/TESTING.md) — automated tests, WebMCP testing, and the headline acceptance flow.
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — HTTPS deployment and submission-freeze guidance.
+- [`docs/PRE_EXISTING_VS_WEBMCP.md`](docs/PRE_EXISTING_VS_WEBMCP.md) — explicit separation of prior product work from challenge-period WebMCP work.
+- [`docs/hackathon-build/prd.md`](docs/hackathon-build/prd.md) — product requirements.
+- [`docs/hackathon-build/spec.md`](docs/hackathon-build/spec.md) — technical specification.
+- [`docs/hackathon-build/checklist.md`](docs/hackathon-build/checklist.md) — build sequence and verification plan.
 
 ## Pre-existing project vs. challenge work
 
@@ -32,13 +107,9 @@ FreeSpirits Real Estate existed before the WebMCP Challenge. The production mark
 
 **This repository is a separate Challenge Edition.** It does not publish the complete proprietary production application.
 
-All WebMCP-specific functionality in this repository is being developed during the challenge submission period, beginning after **August 25, 2026**.
+All WebMCP-specific functionality in this repository is being developed during the challenge submission period, beginning after **August 25, 2026**. The public Git commit history provides timestamped evidence of that work.
 
-See [`docs/PRE_EXISTING_VS_WEBMCP.md`](docs/PRE_EXISTING_VS_WEBMCP.md) for the formal separation of prior work and challenge work.
-
-## Architecture principle
-
-The Challenge Edition is designed to remain isolated from the production codebase.
+## Architecture boundary
 
 ```text
 User / AI Agent
@@ -53,37 +124,40 @@ WebMCP-enabled Challenge App
       +--> prepare_enquiry
       |
       v
-Challenge-safe property data/API boundary
+Challenge-safe property provider
       |
-      v
-FreeSpirits Real Estate data or sanitized demo data
+      +--> sanitized bundled inventory (available now)
+      |
+      +--> optional challenge-safe remote API (future adapter)
 ```
 
-The challenge layer must never require publishing secrets, production credentials, payment internals, private administration code, or unrelated proprietary logic.
+The challenge layer never requires publishing production secrets, payment internals, private administration code, database credentials, or unrelated proprietary logic.
 
-## Competition priorities
+## Judging focus
 
-The implementation is being optimized around the challenge judging criteria:
+The implementation is intentionally aligned with the challenge criteria:
 
-1. **WebMCP Leverage** — meaningful, non-trivial WebMCP tool use.
-2. **Execution** — a coherent, working product experience rather than a technical toy.
-3. **Potential Impact** — a credible improvement to property discovery and decision-making.
-4. **Creativity & Ambition** — a compelling example of humans and agents working together on the open web.
+1. **WebMCP Leverage** — five meaningful structured tools form a real multi-step agent workflow.
+2. **Execution** — a visible, coherent product experience backed by automated CI rather than a schema-only proof of concept.
+3. **Potential Impact** — property seekers can delegate repetitive discovery and comparison while retaining control of contact.
+4. **Creativity & Ambition** — transparent preference-aware ranking plus an explicit human-agent handoff demonstrates an agent-native workflow beyond simple UI automation.
 
-## Safety principles
+## Security principles
 
 - No production secrets committed to this repository.
 - No private database credentials committed.
-- Read-only operations are preferred where practical.
-- Consequential write operations require clear human review/confirmation.
-- Tool schemas should be narrow, explicit, validated, and easy for judges to understand.
+- Tool inputs are narrow and validated.
+- Search results are bounded.
+- Property content is treated as data, not instructions.
+- Private contact data is not exposed through public listing tools.
+- Consequential contact remains human-controlled.
 - Challenge testing must not put the production marketplace at risk.
 
-## Repository status
+## Challenge timeline evidence
 
-**Challenge foundation initialized: August 27, 2026.**
+**Repository initialized: August 27, 2026.**
 
-Implementation will be added through small, timestamped commits so the challenge-specific work is easy to audit.
+Challenge work is recorded through small, timestamped commits so reviewers can audit what was created during the submission period.
 
 ## License
 
