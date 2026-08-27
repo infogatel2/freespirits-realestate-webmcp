@@ -17,6 +17,8 @@ export interface PropertyComparison {
   missingDataWarnings: string[];
 }
 
+const defaultPriorities: ComparisonPriority[] = ['price', 'space', 'renovated'];
+
 const normalizeHigherIsBetter = (value: number, values: number[]) => {
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -32,10 +34,11 @@ const normalizeLowerIsBetter = (value: number, values: number[]) => {
 const hasOutdoorSpace = (property: Property) =>
   property.features.some((feature) => /balcony|terrace|garden|yard/i.test(feature));
 
-export function compareProperties(properties: Property[], requestedPriorities: ComparisonPriority[] = ['price', 'space', 'renovated']): PropertyComparison {
+export function compareProperties(properties: Property[], requestedPriorities: ComparisonPriority[] = defaultPriorities): PropertyComparison {
   if (properties.length < 2 || properties.length > 5) throw new Error('compare_properties requires between 2 and 5 properties.');
 
-  const priorities = [...new Set(requestedPriorities.length ? requestedPriorities : ['price', 'space', 'renovated'])];
+  const selectedPriorities: ComparisonPriority[] = requestedPriorities.length ? requestedPriorities : defaultPriorities;
+  const priorities: ComparisonPriority[] = [...new Set<ComparisonPriority>(selectedPriorities)];
   const prices = properties.map((property) => property.price);
   const areas = properties.map((property) => property.areaSqm);
   const metroValues = properties.flatMap((property) => property.distanceMetroM === undefined ? [] : [property.distanceMetroM]);
