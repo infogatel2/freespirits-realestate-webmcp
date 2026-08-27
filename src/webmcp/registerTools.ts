@@ -1,9 +1,11 @@
+import { compareProperties, type ComparisonPriority, type PropertyComparison } from '../domain/comparison';
 import type { PropertySearchCriteria, PropertySummary } from '../domain/property';
 import { demoPropertyProvider } from '../services/demoPropertyProvider';
 
 export interface WebMCPCallbacks {
   onActivity: (message: string) => void;
   onSearchResults: (results: PropertySummary[]) => void;
+  onComparison: (comparison: PropertyComparison) => void;
 }
 
 const textResult = (payload: unknown) => ({
@@ -15,6 +17,8 @@ const asOptionalNumber = (value: unknown) => (typeof value === 'number' && Numbe
 const asOptionalBoolean = (value: unknown) => (typeof value === 'boolean' ? value : undefined);
 const asOptionalStringArray = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : undefined;
 
+const allowedPriorities: ComparisonPriority[] = ['price', 'space', 'renovated', 'metro_access', 'university_access', 'outdoor_space'];
+
 const parseSearchCriteria = (input: Record<string, unknown>): PropertySearchCriteria => {
   const minPrice = asOptionalNumber(input.minPrice);
   const maxPrice = asOptionalNumber(input.maxPrice);
@@ -22,12 +26,8 @@ const parseSearchCriteria = (input: Record<string, unknown>): PropertySearchCrit
   const maxBedrooms = asOptionalNumber(input.maxBedrooms);
   const requestedLimit = asOptionalNumber(input.limit);
 
-  if (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice) {
-    throw new Error('minPrice cannot be greater than maxPrice.');
-  }
-  if (minBedrooms !== undefined && maxBedrooms !== undefined && minBedrooms > maxBedrooms) {
-    throw new Error('minBedrooms cannot be greater than maxBedrooms.');
-  }
+  if (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice) throw new Error('minPrice cannot be greater than maxPrice.');
+  if (minBedrooms !== undefined && maxBedrooms !== undefined && minBedrooms > maxBedrooms) throw new Error('minBedrooms cannot be greater than maxBedrooms.');
 
   return {
     transactionType: input.transactionType === 'rent' || input.transactionType === 'sale' ? input.transactionType : undefined,
@@ -91,23 +91,51 @@ export async function registerWebMCPTools(callbacks: WebMCPCallbacks) {
     description: 'Retrieve normalized public details for a single property by its stable property ID.',
     inputSchema: {
       type: 'object',
-      properties: {
-        propertyId: { type: 'string', description: 'Stable property ID returned by search_properties.' },
-      },
+      properties: { propertyId: { type: 'string', description: 'Stable property ID returned by search_properties.' } },
       required: ['propertyId'],
     },
     async execute(input) {
       const propertyId = asOptionalString(input.propertyId);
       if (!propertyId) return textResult({ ok: false, error: 'propertyId is required.' });
-
       const property = await demoPropertyProvider.getById(propertyId);
       if (!property) return textResult({ ok: false, error: `Property ${propertyId} was not found.` });
-
       callbacks.onActivity(`Agent inspected ${property.title}.`);
       return textResult({ ok: true, property });
     },
   }, { signal: controller.signal });
 
-  callbacks.onActivity('WebMCP ready: search_properties and get_property_details registered.');
+  await document.modelContext.registerTool({
+    name: 'compare_properties',
+    title: 'Compare properties',
+    description: 'Compare 2–5 properties with a transparent deterministic score against user priorities such as price, space, renovation, metro access, university access, or outdoor space.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        propertyIds: { type: 'array', minItems: 2, maxItems: 5, items: { type: 'string' } },
+        priorities: { type: 'array', items: { type: 'string', enum: allowedPriorities } },
+      },
+      required: ['propertyIds'],
+    },
+    async execute(input) {
+      try {
+        const propertyIds = asOptionalStringArray(input.propertyIds) ?? [];
+        if (propertyIds.length < 2 || propertyIds.length > 5) throw new Error('propertyIds must contain between 2 and 5 IDs.');
+        const requested = (asOptionalStringArray(input.priorities) ?? []).filter((value): value is ComparisonPriority => allowedPriorities.includes(value as ComparisonPriority));
+        const properties = await Promise.all(propertyIds.map((id) => demoPropertyProvider.getById(id)));
+        const missingIds = propertyIds.filter((_, index) => properties[index] === null);
+        if (missingIds.length) throw new Error(`Unknown property IDs: ${missingIds.join(', ')}`);
+        const comparison = compareProperties(properties.filter((property) => property !== null), requested);
+        callbacks.onComparison(comparison);
+        callbacks.onActivity(`Agent compared ${propertyIds.length} properties using ${comparison.priorities.join(', ')}.`);
+        return textResult({ ok: true, comparison });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown comparison error.';
+        callbacks.onActivity(`Comparison rejected: ${message}`);
+        return textResult({ ok: false, error: message });
+      }
+    },
+  }, { signal: controller.signal });
+
+  callbacks.onActivity('WebMCP ready: search, details, and comparison tools registered.');
   return () => controller.abort();
 }
