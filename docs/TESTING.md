@@ -75,7 +75,7 @@ then the page is running normally but the browser has not exposed `document.mode
 
 Give the agent this request:
 
-> Find renovated 2–3 bedroom apartments in Thessaloniki under €750/month, compare the best three, save my favorite, and prepare an enquiry for me to review.
+> Find renovated 2–3 bedroom apartments in Thessaloniki under €760/month, compare the best three, save my favorite, and prepare an enquiry for me to review.
 
 Expected behavior:
 
@@ -85,7 +85,7 @@ The agent calls `search_properties` with criteria equivalent to:
 
 - transaction type: rent
 - location: Thessaloniki
-- maximum price: 750
+- maximum price: 760
 - bedrooms: 2–3
 - renovated: true
 
