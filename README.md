@@ -1,8 +1,14 @@
 # FreeSpirits Real Estate — WebMCP Challenge Edition
 
-FreeSpirits Real Estate — WebMCP Challenge Edition is a focused, open-source extension of the existing FreeSpirits Real Estate marketplace, created for **The WebMCP Challenge**.
+FreeSpirits Real Estate — WebMCP Challenge Edition is a focused, open-source extension of the existing FreeSpirits Real Estate marketplace, originally created for **The WebMCP Challenge**.
 
 It demonstrates a real agent-native property discovery workflow where people and AI agents work together through structured WebMCP tools instead of forcing an agent to infer intent from page layouts, buttons, and forms.
+
+## Live demo
+
+**https://infogatel2.github.io/freespirits-realestate-webmcp/**
+
+The public demo is automatically tested, built, and deployed to GitHub Pages from the `main` branch through GitHub Actions.
 
 ## The demo in one sentence
 
@@ -90,12 +96,12 @@ npm run build
 npm run dev
 ```
 
-The public CI workflow also runs the tests and production build on pushes to `main`.
+The public CI workflow runs the tests and production build on pushes to `main`. The GitHub Pages workflow then publishes the successful build automatically.
 
 See:
 
 - [`docs/TESTING.md`](docs/TESTING.md) — automated tests, WebMCP testing, and the headline acceptance flow.
-- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — HTTPS deployment and submission-freeze guidance.
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — HTTPS deployment guidance.
 - [`docs/PRE_EXISTING_VS_WEBMCP.md`](docs/PRE_EXISTING_VS_WEBMCP.md) — explicit separation of prior product work from challenge-period WebMCP work.
 - [`docs/hackathon-build/prd.md`](docs/hackathon-build/prd.md) — product requirements.
 - [`docs/hackathon-build/spec.md`](docs/hackathon-build/spec.md) — technical specification.
@@ -107,7 +113,7 @@ FreeSpirits Real Estate existed before the WebMCP Challenge. The production mark
 
 **This repository is a separate Challenge Edition.** It does not publish the complete proprietary production application.
 
-All WebMCP-specific functionality in this repository is being developed during the challenge submission period, beginning after **August 25, 2026**. The public Git commit history provides timestamped evidence of that work.
+All WebMCP-specific functionality in this repository was developed during the challenge submission period, beginning after **August 25, 2026**. The public Git commit history provides timestamped evidence of that work.
 
 ## Architecture boundary
 
@@ -126,21 +132,20 @@ WebMCP-enabled Challenge App
       v
 Challenge-safe property provider
       |
-      +--> sanitized bundled inventory (available now)
+      +--> sanitized bundled inventory
       |
-      +--> optional challenge-safe remote API (future adapter)
+      +--> optional challenge-safe remote API
 ```
 
 The challenge layer never requires publishing production secrets, payment internals, private administration code, database credentials, or unrelated proprietary logic.
 
-## Judging focus
+## Project strengths
 
-The implementation is intentionally aligned with the challenge criteria:
-
-1. **WebMCP Leverage** — five meaningful structured tools form a real multi-step agent workflow.
-2. **Execution** — a visible, coherent product experience backed by automated CI rather than a schema-only proof of concept.
-3. **Potential Impact** — property seekers can delegate repetitive discovery and comparison while retaining control of contact.
-4. **Creativity & Ambition** — transparent preference-aware ranking plus an explicit human-agent handoff demonstrates an agent-native workflow beyond simple UI automation.
+1. **WebMCP leverage** — five meaningful structured tools form a real multi-step agent workflow.
+2. **Execution** — a visible, coherent product experience backed by automated tests, builds, and deployment rather than a schema-only proof of concept.
+3. **Potential impact** — property seekers can delegate repetitive discovery and comparison while retaining control of contact.
+4. **Transparent decision support** — preference-aware deterministic ranking keeps recommendations explainable.
+5. **Human-agent collaboration** — consequential contact remains explicitly under human control.
 
 ## Security principles
 
@@ -151,7 +156,7 @@ The implementation is intentionally aligned with the challenge criteria:
 - Property content is treated as data, not instructions.
 - Private contact data is not exposed through public listing tools.
 - Consequential contact remains human-controlled.
-- Challenge testing must not put the production marketplace at risk.
+- Challenge testing does not put the production marketplace at risk.
 
 ## Challenge timeline evidence
 
