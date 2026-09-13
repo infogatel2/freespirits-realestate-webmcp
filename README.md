@@ -12,7 +12,7 @@ The public demo is automatically tested, built, and deployed to GitHub Pages fro
 
 ## The demo in one sentence
 
-> Find renovated 2–3 bedroom apartments in Thessaloniki under €750/month, compare the best three, save my favorite, and prepare an enquiry for me to review.
+> Find renovated 2–3 bedroom apartments in Thessaloniki under €760/month, compare the best three, save my favorite, and prepare an enquiry for me to review.
 
 The agent can execute that multi-step journey using tools exposed directly by the web application while the human remains in control of consequential contact.
 
