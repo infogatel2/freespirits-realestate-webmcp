@@ -4,7 +4,7 @@ import type { EnquiryDraft } from './domain/enquiry';
 import type { PropertySummary } from './domain/property';
 import { registerWebMCPTools } from './webmcp/registerTools';
 
-const demoPrompt = 'Find renovated 2–3 bedroom apartments in Thessaloniki under €750/month, compare the best three, save my favorite, and prepare an enquiry for me to review.';
+const demoPrompt = 'Find renovated 2–3 bedroom apartments in Thessaloniki under €760/month, compare the best three, save my favorite, and prepare an enquiry for me to review.';
 
 export default function App() {
   const [results, setResults] = useState<PropertySummary[]>([]);
